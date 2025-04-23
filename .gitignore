@@ -1,0 +1,7 @@
+kaggle.json
+tf-venv/
+dataset/
+training_dataset/
+validation_dataset/
+dataset_backup/
+**/__pycache__/
