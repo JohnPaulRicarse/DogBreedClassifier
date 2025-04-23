@@ -5,7 +5,6 @@ import shared.paths as paths
 
 paths.init()
 
-# /home/jp/.cache/kagglehub/datasets/khushikhushikhushi/dog-breed-image-dataset/versions/1
 class Downloader:
   def download(kaggle_url):
     path = kagglehub.dataset_download(kaggle_url)

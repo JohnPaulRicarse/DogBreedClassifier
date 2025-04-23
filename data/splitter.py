@@ -28,9 +28,3 @@ class Splitter:
 
         os.makedirs(f"{target_dir}", exist_ok=True)
         shutil.copy(f"{unsorted_path}/{breed}/{filename}", f"{target_dir}/{filename}")
-
-    # for file in os.listdir(path):
-    #   if fnmatch
-
-  def count_files(path):
-    return len(fnmatch.filter(os.listdir(path), '*.jpg'))
