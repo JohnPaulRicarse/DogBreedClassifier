@@ -7,16 +7,8 @@
 
 # Setup
 
-Create the TF virtual env
+Install Dependencies from the Requirements File.
 
-`python -m venv tf-venv`
-
-
-Swap to the tf virtual environment
-
-`source tf-venv/bin/activate`
-
-Install the Necessarry dependencies
 
 TODO: Fix requirements txt
 
