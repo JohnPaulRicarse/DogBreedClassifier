@@ -15,21 +15,19 @@ class Splitter:
     unsorted_path = f"{paths.project_path}/dataset"
     for breed in classifications.breeds:
       class_path = f"{unsorted_path}/{breed}"
-      print(class_path)
-
       filenames = fnmatch.filter(os.listdir(class_path), '*.jpg')
       split_index = round(len(filenames) * SPLIT_RATIO)
-      print("Split index", split_index)
 
-      target_dir = f"{paths.project_path}/sorted_dataset/{breed}/"
-      print("Target Dir: ", target_dir)
+      print(f"Class Path:     {class_path}")
+      print(f"Classification: {breed}")
+
       for index, filename in enumerate(filenames):
-        subfolder = 'train'
+        target_dir = f"{paths.project_path}/training_dataset/{breed}"
         if index > split_index:
-          subfolder = 'validation'
+          target_dir = f"{paths.project_path}/validation_dataset/{breed}"
 
-        os.makedirs(f"{target_dir}/{subfolder}", exist_ok=True)
-        shutil.copy(f"{unsorted_path}/{breed}/{filename}", f"{target_dir}/{subfolder}/{filename}")
+        os.makedirs(f"{target_dir}", exist_ok=True)
+        shutil.copy(f"{unsorted_path}/{breed}/{filename}", f"{target_dir}/{filename}")
 
     # for file in os.listdir(path):
     #   if fnmatch

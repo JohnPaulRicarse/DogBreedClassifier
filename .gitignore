@@ -1,6 +1,7 @@
 kaggle.json
 tf-venv/
 dataset/
-sorted_dataset/
+training_dataset/
+validation_dataset/
 dataset_backup/
 **/__pycache__/
