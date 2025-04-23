@@ -2,6 +2,7 @@ import tensorflow as tf
 from keras import layers
 from keras import Sequential
 import matplotlib.pyplot as plt
+import numpy as np
 
 from data.downloader import Downloader
 from data.splitter import Splitter
@@ -29,20 +30,22 @@ Splitter.split(SPLIT_RATIO)
 training_directory = f"{paths.project_path}/training_dataset" 
 validation_directory = f"{paths.project_path}/validation_dataset" 
 
-IMG_SIZE = (100, 160)
+IMG_WIDTH = 160
+IMG_HEIGHT = 100
+IMG_SIZE = (IMG_HEIGHT, IMG_WIDTH)
 IS_SHUFFLE = True
-BATCH_SIZE = 15
+BATCH_SIZE = 32
 
-train_dataset = tf.keras.utils.image_dataset_from_directory(training_directory,
+train_dataset = tf.keras.preprocessing.image_dataset_from_directory(training_directory,
                                                             shuffle=IS_SHUFFLE,
                                                             image_size=IMG_SIZE,
                                                             batch_size=BATCH_SIZE)
-validation_dataset = tf.keras.utils.image_dataset_from_directory(validation_directory,
+validation_dataset = tf.keras.preprocessing.image_dataset_from_directory(validation_directory,
                                                             shuffle=IS_SHUFFLE,
                                                             image_size=IMG_SIZE,
                                                             batch_size=BATCH_SIZE)
 class_names = train_dataset.class_names
-
+number_of_classes = len(train_dataset.class_names)
 # Visualise the training dataset in a grid of images
 plt.figure(figsize=(10, 10))
 for images, labels in train_dataset.take(1):
@@ -93,3 +96,109 @@ for image, _ in train_dataset.take(1):
 
 
 # %%
+# Create Base model using Resnet50
+# https://www.tensorflow.org/tutorials/images/transfer_learning#create_the_base_model_from_the_pre-trained_convnets
+# https://medium.com/@nitishkundu1993/exploring-resnet50-an-in-depth-look-at-the-model-architecture-and-code-implementation-d8d8fa67e46f
+# https://www.tensorflow.org/api_docs/python/tf/keras/applications/ResNet50?hl=en
+
+pretrained_model = tf.keras.applications.ResNet50(include_top=False,
+                                                  pooling='avg',
+                                                  weights='imagenet')
+
+for layer in pretrained_model.layers:
+    layer.trainable = False
+
+
+
+
+# %%
+# Classification
+# https://www.tensorflow.org/tutorials/images/transfer_learning#add_a_classification_head
+# https://medium.com/@nitishkundu1993/exploring-resnet50-an-in-depth-look-at-the-model-architecture-and-code-implementation-d8d8fa67e46f
+# https://stackoverflow.com/questions/65609285/in-tensorflow-adding-data-augmentation-layers-to-my-keras-model-slows-down-trai
+
+input_shape = (IMG_HEIGHT, IMG_WIDTH, 3)
+resnet_model = Sequential([
+  layers.InputLayer(input_shape=input_shape),
+  data_augmentation,
+  pretrained_model,
+  layers.Dense(1024, activation='relu'),
+  layers.Dense(512, activation='relu'),
+  layers.Dense(number_of_classes)
+])
+
+resnet_model.summary()
+
+# %%
+# Compiling and Training
+# https://medium.com/@nitishkundu1993/exploring-resnet50-an-in-depth-look-at-the-model-architecture-and-code-implementation-d8d8fa67e46f
+# https://www.tensorflow.org/api_docs/python/tf/keras/Model#compile
+# https://www.tensorflow.org/api_docs/python/tf/keras/metrics/CategoricalAccuracy
+# https://www.geeksforgeeks.org/categorical-cross-entropy-in-multi-class-classification/
+
+#  In loss categorical_crossentropy, expected y_pred.shape to be (batch_size, num_classes) with num_classes > 1. Received: y_pred.shape=(None, 1). Consider using 'binary_crossentropy' if you only have 2 classes.
+# return self.fn(y_true, y_pred, **self._fn_kwargs)
+
+initial_epochs = 15
+base_learning_rate = 0.001
+resnet_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+                       loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                       metrics=['accuracy'])
+
+history = resnet_model.fit(train_dataset,
+                    epochs=initial_epochs,
+                    validation_data=validation_dataset)
+
+# %%
+# Learning Curves
+# https://www.tensorflow.org/tutorials/images/transfer_learning#
+
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+
+plt.figure(figsize=(8, 8))
+plt.subplot(2, 1, 1)
+plt.plot(acc, label='Training Accuracy')
+plt.plot(val_acc, label='Validation Accuracy')
+plt.legend(loc='lower right')
+plt.ylabel('Accuracy')
+plt.ylim([min(plt.ylim()),1])
+plt.title('Training and Validation Accuracy')
+
+plt.subplot(2, 1, 2)
+plt.plot(loss, label='Training Loss')
+plt.plot(val_loss, label='Validation Loss')
+plt.legend(loc='upper right')
+plt.ylabel('Cross Entropy')
+plt.ylim([0,1.0])
+plt.title('Training and Validation Loss')
+plt.xlabel('epoch')
+plt.show()
+
+
+# %%
+# Predictions
+dog_pic_url = "https://dl5zpyw5k3jeb.cloudfront.net/photos/pets/69065436/6/?bust=1695869217&width=720"
+dog_pic_path = tf.keras.utils.get_file('dogbreed', origin=dog_pic_url)
+print("Path: ", dog_pic_path)
+
+img = tf.keras.utils.load_img(
+    dog_pic_path, target_size=(IMG_HEIGHT, IMG_WIDTH)
+)
+
+img_array = tf.keras.utils.img_to_array(img)
+img_array = tf.expand_dims(img_array, 0) # Create a batch
+
+predictions = resnet_model.predict(img_array)
+score = tf.nn.softmax(predictions[0])
+
+print(
+    "This image most likely belongs to {} with a {:.2f} percent confidence."
+    .format(class_names[np.argmax(score)], 100 * np.max(score))
+)
+
+import os
+os.remove(dog_pic_path)
