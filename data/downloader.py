@@ -1,16 +1,14 @@
 import kagglehub
 import shutil
+
 import shared.paths as paths
+
 paths.init()
 
+# /home/jp/.cache/kagglehub/datasets/khushikhushikhushi/dog-breed-image-dataset/versions/1
 class Downloader:
-  def __init__(self, kaggle_url, dataset_dir):
-    self.kaggle_url = kaggle_url
-    self.dataset_dir = "{project_path}".format(dataset_dir=dataset_dir, project_path=paths.project_path)
-    
-  def download(self):
-    path = kagglehub.dataset_download(self.kaggle_url)
-    shutil.move("{path}/dataset".format(path=path), self.dataset_dir)
-    print("Path is: {path}".format(path=path))
-    print("Dataset Path is: {path}".format(path=self.dataset_dir))
+  def download(kaggle_url):
+    path = kagglehub.dataset_download(kaggle_url)
+    print(f"Path is: {path}")
+    shutil.copytree(f"{path}", paths.project_path, dirs_exist_ok=True)
     print("Download Method Finished!")
