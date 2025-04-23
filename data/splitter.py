@@ -8,15 +8,13 @@ import shared.paths as paths
 classifications.init()
 paths.init()
 
-SPLIT_RATIO = 0.7
-
 class Splitter:
-  def split():
+  def split(split_ratio):
     unsorted_path = f"{paths.project_path}/dataset"
     for breed in classifications.breeds:
       class_path = f"{unsorted_path}/{breed}"
       filenames = fnmatch.filter(os.listdir(class_path), '*.jpg')
-      split_index = round(len(filenames) * SPLIT_RATIO)
+      split_index = round(len(filenames) * split_ratio)
 
       print(f"Class Path:     {class_path}")
       print(f"Classification: {breed}")
