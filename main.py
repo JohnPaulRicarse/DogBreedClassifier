@@ -2,8 +2,10 @@ import tensorflow as tf
 from keras import layers
 from keras import Sequential
 import matplotlib.pyplot as plt
+import numpy as np
 
 from prediction import Prediction
+from learning_visualization import LearningVisualization
 from data.downloader import Downloader
 from data.splitter import Splitter
 
@@ -105,26 +107,39 @@ pretrained_model = tf.keras.applications.ResNet50(include_top=False,
                                                   pooling='avg',
                                                   weights='imagenet')
 
-for layer in pretrained_model.layers:
-    layer.trainable = False
+pretrained_model.trainable = False
 
 # %%
 # Classification
 # https://www.tensorflow.org/tutorials/images/transfer_learning#add_a_classification_head
-# https://medium.com/@nitishkundu1993/exploring-resnet50-an-in-depth-look-at-the-model-architecture-and-code-implementation-d8d8fa67e46f
+# https://medium.com/@kenneth.ca95/a-guide-to-transfer-learning-with-keras-using-resnet50-a81a4a28084b
 # https://stackoverflow.com/questions/65609285/in-tensorflow-adding-data-augmentation-layers-to-my-keras-model-slows-down-trai
 
 input_shape = (IMG_HEIGHT, IMG_WIDTH, 3)
 resnet_model = Sequential([
-  layers.InputLayer(input_shape=input_shape),
+  layers.InputLayer(shape=input_shape),
   data_augmentation,
   pretrained_model,
+  layers.Flatten(),
+  layers.BatchNormalization(),
   layers.Dense(1024, activation='relu'),
+  layers.Dropout(0.2),
+  layers.BatchNormalization(),
   layers.Dense(512, activation='relu'),
-  layers.Dense(number_of_classes)
+  layers.Dropout(0.2),
+  layers.BatchNormalization(),
+  layers.Dense(256, activation='relu'),
+  layers.Dropout(0.2),
+  layers.BatchNormalization(),
+  layers.Dense(128, activation='relu'),
+  layers.Dropout(0.2),
+  layers.BatchNormalization(),
+  layers.Dense(64, activation='relu'),
+  layers.Dropout(0.2),
+  layers.BatchNormalization(),
+  layers.Dense(number_of_classes, activation='softmax')
 ])
 
-resnet_model.summary()
 
 # %%
 # Compiling and Training
@@ -136,11 +151,13 @@ resnet_model.summary()
 #  In loss categorical_crossentropy, expected y_pred.shape to be (batch_size, num_classes) with num_classes > 1. Received: y_pred.shape=(None, 1). Consider using 'binary_crossentropy' if you only have 2 classes.
 # return self.fn(y_true, y_pred, **self._fn_kwargs)
 
-initial_epochs = 10
+initial_epochs = 50
 base_learning_rate = 0.001
-resnet_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-                       loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+resnet_model.compile(optimizer=tf.keras.optimizers.RMSprop(learning_rate=base_learning_rate),
+                       loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                        metrics=['accuracy'])
+
+resnet_model.summary()
 
 history = resnet_model.fit(train_dataset,
                     epochs=initial_epochs,
@@ -175,8 +192,65 @@ plt.title('Training and Validation Loss')
 plt.xlabel('epoch')
 plt.show()
 
+# %%
+# Predictions w/o fine tuning
+dog_pic_url = "https://cdn.prod.website-files.com/5f7adfe5ed7d773f90050d9e/627499b029c8d366a371b423_poodle-malaysia.jpg"
+prediction = Prediction(resnet_model, class_names, (IMG_HEIGHT, IMG_WIDTH))
+prediction.predict(dog_pic_url)
 
 # %%
-# Predictions
-dog_pic_url = "https://s3.amazonaws.com/cdn-origin-etr.akc.org/wp-content/uploads/2020/07/28113003/Yorkshire-Terrier-puppy-in-a-dog-bed.20200601164413905.jpg"
-Prediction.predict(dog_pic_url, resnet_model, class_names, (IMG_HEIGHT, IMG_WIDTH))
+# Fine Tuning
+
+fine_tune_epochs = 50
+total_epochs =  initial_epochs + fine_tune_epochs
+pretrained_model.trainable = True
+fine_tune_at = 80
+
+for layer in pretrained_model.layers[:fine_tune_at]:
+    layer.trainable = False
+
+# Recompile the 
+resnet_model.compile(optimizer=tf.keras.optimizers.RMSprop(learning_rate=base_learning_rate),
+                       loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                       metrics=['accuracy'])
+
+resnet_model.summary()
+
+
+history_fine = resnet_model.fit(train_dataset,
+                         epochs=total_epochs,
+                         initial_epoch=len(history.epoch),
+                         validation_data=validation_dataset)
+
+acc += history_fine.history['accuracy']
+val_acc += history_fine.history['val_accuracy']
+
+loss += history_fine.history['loss']
+val_loss += history_fine.history['val_loss']
+
+plt.figure(figsize=(8, 8))
+plt.subplot(2, 1, 1)
+plt.plot(acc, label='Training Accuracy')
+plt.plot(val_acc, label='Validation Accuracy')
+plt.ylim([0.8, 1])
+plt.plot([initial_epochs-1,initial_epochs-1],
+          plt.ylim(), label='Start Fine Tuning')
+plt.legend(loc='lower right')
+plt.title('Training and Validation Accuracy')
+
+plt.subplot(2, 1, 2)
+plt.plot(loss, label='Training Loss')
+plt.plot(val_loss, label='Validation Loss')
+plt.ylim([0, 1.0])
+plt.plot([initial_epochs-1,initial_epochs-1],
+         plt.ylim(), label='Start Fine Tuning')
+plt.legend(loc='upper right')
+plt.title('Training and Validation Loss')
+plt.xlabel('epoch')
+plt.show()
+
+# %%
+# Predictions w/ Fine tuning
+dog_pic_url = "https://cdn.prod.website-files.com/5f7adfe5ed7d773f90050d9e/627499b029c8d366a371b423_poodle-malaysia.jpg"
+prediction = Prediction(resnet_model, class_names, (IMG_HEIGHT, IMG_WIDTH))
+prediction.predict(dog_pic_url)
