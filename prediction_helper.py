@@ -2,7 +2,7 @@ import os
 import tensorflow as tf
 import numpy as np
 
-class Prediction:
+class PredictionHelper:
   def __init__(self, resnet_model, class_names, img_shape):
     self.resnet_model = resnet_model
     self.class_names = class_names
