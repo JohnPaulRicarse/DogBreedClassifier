@@ -32,11 +32,11 @@ Splitter.split(SPLIT_RATIO)
 training_directory = f"{paths.project_path}/training_dataset" 
 validation_directory = f"{paths.project_path}/validation_dataset" 
 
-IMG_WIDTH = 160
-IMG_HEIGHT = 100
+IMG_WIDTH = 224
+IMG_HEIGHT = 224
 IMG_SIZE = (IMG_HEIGHT, IMG_WIDTH)
 IS_SHUFFLE = True
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 
 train_dataset = tf.keras.preprocessing.image_dataset_from_directory(training_directory,
                                                             shuffle=IS_SHUFFLE,
@@ -94,6 +94,7 @@ for image, _ in train_dataset.take(1):
 # https://medium.com/@nitishkundu1993/exploring-resnet50-an-in-depth-look-at-the-model-architecture-and-code-implementation-d8d8fa67e46f
 # https://www.tensorflow.org/api_docs/python/tf/keras/applications/ResNet50?hl=en
 
+# Pretrained has 176 layers
 pretrained_model = tf.keras.applications.ResNet50(include_top=False,
                                                   pooling='avg',
                                                   weights='imagenet')
@@ -108,7 +109,8 @@ pretrained_model.trainable = False
 
 preprocess_input = tf.keras.applications.resnet50.preprocess_input
 
-# Prefetch the images into memory for performance
+# %%
+# Data Prefetching
 # NOTE: https://www.tensorflow.org/guide/data_performance
 AUTOTUNE = tf.data.AUTOTUNE # -1
 
@@ -152,13 +154,19 @@ x = pretrained_model(x, training=False)
 x = layers.Flatten()(x)
 x = layers.BatchNormalization()(x)
 x = layers.Dense(1024, activation='relu')(x)
-x = layers.Dropout(0.2)(x)
+x = layers.Dropout(0.3)(x)
 x = layers.BatchNormalization()(x)
 x = layers.Dense(512, activation='relu')(x)
-x = layers.Dropout(0.2)(x)
+x = layers.Dropout(0.3)(x)
 x = layers.BatchNormalization()(x)
 x = layers.Dense(256, activation='relu')(x)
-x = layers.Dropout(0.2)(x)
+x = layers.Dropout(0.3)(x)
+x = layers.BatchNormalization()(x)
+x = layers.Dense(128, activation='relu')(x)
+x = layers.Dropout(0.3)(x)
+x = layers.BatchNormalization()(x)
+x = layers.Dense(64, activation='relu')(x)
+x = layers.Dropout(0.3)(x)
 x = layers.BatchNormalization()(x)
 outputs = prediction_layer(x)
 
@@ -216,6 +224,41 @@ plt.xlabel('epoch')
 plt.show()
 
 # %%
+# Mass Prediction w/o Fine tuning
+
+sample_set = {
+  "Beagle": "https://i.pinimg.com/736x/51/c6/0f/51c60fcb12a5fdfb2af386d296f5d14e.jpg",
+  "Boxer": "https://i.pinimg.com/736x/2e/a7/ce/2ea7cea704052ae3673fcd33118c1db4.jpg",
+  "Bulldog": "https://i.pinimg.com/736x/71/42/fb/7142fbd8f9467b9a09d982d0a197ad61.jpg",
+  "Hotdog_Dog": "https://i.pinimg.com/736x/bc/14/f6/bc14f673187a0b67ba7f940ef30ef392.jpg",
+  "German_Shepherd": "https://i.pinimg.com/736x/1b/96/8f/1b968f0c5076f5fd840cc37d8770207a.jpg",
+  "Golden_Retriever": "https://i.pinimg.com/736x/1c/80/7e/1c807eb83d6e24c7dfe03d8bc97c43bf.jpg",
+  "Labrador": "https://i.pinimg.com/736x/14/e3/a2/14e3a216753fd795848cc22417b27e40.jpg",
+  "Poodle": "https://i.pinimg.com/736x/3f/23/43/3f2343558d24c0bd0836e2466961d7a6.jpg",
+  "Rotty": "https://i.pinimg.com/736x/c5/d7/a3/c5d7a37654da3ebe930b3fb721f31181.jpg",
+  "Yorkie": "https://i.pinimg.com/736x/45/96/db/4596db77a4ac82c5fcd709a7c0ec6d85.jpg"
+}
+
+for key in sample_set:
+  print("==============================================================")
+  print(f"Actual Breed: {key}")
+  p_helper = PredictionHelper(resnet_model, class_names, (IMG_HEIGHT, IMG_WIDTH))
+  p_helper.predict(sample_set[key])
+
+# %%
+# Mass prediction with test dataset w/o Fine tuning
+image_batch, label_batch = test_dataset.as_numpy_iterator().next()
+predictions = resnet_model.predict_on_batch(image_batch)
+
+plt.figure(figsize=(10, 10))
+for i in range(9):
+  score = tf.nn.softmax(predictions[i])
+  ax = plt.subplot(3, 3, i + 1)
+  plt.imshow(image_batch[i].astype("uint8"))
+  plt.title(f"{class_names[np.argmax(score)]}, conf: {math.floor(100 * np.max(score))}")
+  plt.axis("off")
+
+# %%
 # Fine Tuning
 
 fine_tune_epochs = 15
@@ -232,7 +275,6 @@ resnet_model.compile(optimizer=tf.keras.optimizers.RMSprop(learning_rate=base_le
                        metrics=['accuracy'])
 
 resnet_model.summary()
-
 
 history_fine = resnet_model.fit(train_dataset,
                          epochs=total_epochs,
@@ -300,3 +342,6 @@ for i in range(9):
   plt.imshow(image_batch[i].astype("uint8"))
   plt.title(f"{class_names[np.argmax(score)]}, conf: {math.floor(100 * np.max(score))}")
   plt.axis("off")
+
+
+# %%
