@@ -2,8 +2,8 @@ import tensorflow as tf
 from keras import layers
 from keras import Sequential
 import matplotlib.pyplot as plt
-import numpy as np
 
+from prediction import Prediction
 from data.downloader import Downloader
 from data.splitter import Splitter
 
@@ -108,9 +108,6 @@ pretrained_model = tf.keras.applications.ResNet50(include_top=False,
 for layer in pretrained_model.layers:
     layer.trainable = False
 
-
-
-
 # %%
 # Classification
 # https://www.tensorflow.org/tutorials/images/transfer_learning#add_a_classification_head
@@ -139,7 +136,7 @@ resnet_model.summary()
 #  In loss categorical_crossentropy, expected y_pred.shape to be (batch_size, num_classes) with num_classes > 1. Received: y_pred.shape=(None, 1). Consider using 'binary_crossentropy' if you only have 2 classes.
 # return self.fn(y_true, y_pred, **self._fn_kwargs)
 
-initial_epochs = 15
+initial_epochs = 10
 base_learning_rate = 0.001
 resnet_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
                        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
@@ -181,24 +178,5 @@ plt.show()
 
 # %%
 # Predictions
-dog_pic_url = "https://dl5zpyw5k3jeb.cloudfront.net/photos/pets/69065436/6/?bust=1695869217&width=720"
-dog_pic_path = tf.keras.utils.get_file('dogbreed', origin=dog_pic_url)
-print("Path: ", dog_pic_path)
-
-img = tf.keras.utils.load_img(
-    dog_pic_path, target_size=(IMG_HEIGHT, IMG_WIDTH)
-)
-
-img_array = tf.keras.utils.img_to_array(img)
-img_array = tf.expand_dims(img_array, 0) # Create a batch
-
-predictions = resnet_model.predict(img_array)
-score = tf.nn.softmax(predictions[0])
-
-print(
-    "This image most likely belongs to {} with a {:.2f} percent confidence."
-    .format(class_names[np.argmax(score)], 100 * np.max(score))
-)
-
-import os
-os.remove(dog_pic_path)
+dog_pic_url = "https://s3.amazonaws.com/cdn-origin-etr.akc.org/wp-content/uploads/2020/07/28113003/Yorkshire-Terrier-puppy-in-a-dog-bed.20200601164413905.jpg"
+Prediction.predict(dog_pic_url, resnet_model, class_names, (IMG_HEIGHT, IMG_WIDTH))
